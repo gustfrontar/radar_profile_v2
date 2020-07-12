@@ -9,7 +9,7 @@ import os
 import glob
 import scipy.io as sio
 import numpy as np
-import rvd_read as rr 
+from src import rvd_read as rr 
 from datetime import datetime as dt
 from datetime import timedelta
 import gc 

@@ -1,4 +1,4 @@
-import radar_profile_module as rpm 
+from src import radar_profile_module as rpm 
 from datetime import datetime as dt
 from datetime import timedelta
 import pickle as pkl
