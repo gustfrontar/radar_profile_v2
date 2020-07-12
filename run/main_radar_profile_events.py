@@ -43,18 +43,23 @@ for ievent , my_event in enumerate( cases_dict['date'] ) :
       event_lat = float( station_dict[ cases_dict['ID'][ievent] ]['lat'] )
 
       #Caclulo el perfil vertical de la reflectividad en base a la lista que encontre.
-      event_th_mean_profile = rpm.get_profiles( event_file_list , lonradar , latradar , altradar , event_lon , event_lat , profile_radius )
+      event_profiles = rpm.get_profiles( event_file_list , lonradar , latradar , altradar , event_lon , event_lat , profile_radius )
    
       #Agregamos algo de metadata al diccionario que contiene el perfil promediado sobre el cilindro.
-      event_th_mean_profile['ini_date'] = event_ini_date
-      event_th_mean_profile['end_date'] = event_end_date
-      event_th_mean_profile['pp6h_obs_date'] = event_date
-      event_th_mean_profile['pp6h'] = cases_dict['pp6h'][ievent]
-      event_th_mean_profile['ID'] = cases_dict['ID'][ievent]
-      event_th_mean_profile['name'] = station_dict[ cases_dict['ID'][ievent] ]['name']
+      event_profiles['ini_date'] = event_ini_date
+      event_profiles['end_date'] = event_end_date
+      event_profiles['pp6h_obs_date'] = event_date
+      event_profiles['pp6h'] = cases_dict['pp6h'][ievent]
+      event_profiles['ID'] = cases_dict['ID'][ievent]
+      event_profiles['name'] = station_dict[ cases_dict['ID'][ievent] ]['name']
+
+      #Para ahorrar espacio en disco.
+      del event_profiles['z_raw_profile']
+      del event_profiles['alt_raw_profile']
+      del event_profiles['elev_raw_profile']
 
       #Guardamos el perfil medio sobre el cilindro. 
-      pickle_file = output_path + '/event_th_mean_profile_' + cases_dict['ID'][ievent] + '_' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + '.pkl'
+      pickle_file = output_path + '/event_profiles_' + cases_dict['ID'][ievent] + '_' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + '.pkl'
       pkl.dump( event_th_mean_profile , open( pickle_file , "wb" ) )
 
 

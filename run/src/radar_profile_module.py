@@ -158,10 +158,14 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
          my_profile['maxref_th_profile']  = np.zeros( (nz , nfiles) )  
          my_profile['minref_th_profile']  = np.zeros( (nz , nfiles) )
          my_profile['num_th_profile']     = np.zeros( (nz , nfiles) )
+         my_profile['z_raw_profile']      = list()
+         my_profile['alt_raw_profile']    = list()
+         my_profile['elev_raw_profile']   = list()
          my_profile['z_nn_profile']       = list()
          my_profile['ref_nn_profile']     = list()
          my_profile['elev_nn_profile']    = list()
          my_profile['date']               = list()
+
 
       my_profile['z_th_profile'][:,ifile]       = zp
       my_profile['meanref_th_profile'][:,ifile] = meanp
@@ -170,7 +174,9 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
       my_profile['minref_th_profile'][:,ifile]  = minp
       my_profile['num_th_profile'][:,ifile]     = nump
       my_profile['date'].append( date )
-
+      my_profile['z_raw_profile'].append( ref )
+      my_profile['alt_raw_profile'].append( alt )
+      my_profile['elev_raw_profile'].append( elev )
       my_profile['z_nn_profile'].append( nn_alt )
       my_profile['ref_nn_profile'].append( nn_ref )
       my_profile['elev_nn_profile'].append( nn_elev )
