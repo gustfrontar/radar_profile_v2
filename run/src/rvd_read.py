@@ -9,7 +9,7 @@ import pyart
 shift_az=7.5   #
 shift_date = '20150420'
 
-def rvd_read( input_file , radar_lon , radar_lat , radar_alt ) :
+def rvd_read( input_file , radar_lon , radar_lat , radar_alt , correct_az = True , correct_elev = True ) :
 
    my_file = open(input_file,'rb')
    header_bufr=io.BytesIO( my_file.read(512*4) )
@@ -53,6 +53,17 @@ def rvd_read( input_file , radar_lon , radar_lat , radar_alt ) :
    # Make a empty radar with the dimensions of the dataset.
    radar = pyart.testing.make_empty_ppi_radar( max_nrange , nazimuth , header['NELEVS'])
 
+   if correct_elev :
+      if header['NELEVS']== 12 :
+         header['ELEVS'] = np.array([0.3,0.5,0.9,1.3,1.8,2.3,3.1,4.0,5.1,6.3,8.0,10.0])
+      elif header['NELEVS']== 14 :
+         header['ELEVS'] = np.array([0.3,0.5,0.9,1.3,1.8,2.3,3.1,4.0,5.1,6.3,8.0,10.0,13.0,19.0])
+      elif header['NELEVS']== 15 :
+         header['ELEVS'] = np.array([0.4,0.9,1.3,1.7,2.2,2.8,3.5,4.4,5.5,6.8,8.4,10.3,13.4,19.2,34.3])
+      else  :
+         if header['ELEVS'][0] == header['ELEVS'][1] :
+            header['ELEVS'][0]=0.3 
+
    # Start filling the radar attributes with variables in the dataset.
 
    radar.latitude['data']     = np.array([radar_lat])
@@ -93,9 +104,10 @@ def rvd_read( input_file , radar_lon , radar_lat , radar_alt ) :
             
             
    #Rotate azimuth for dates before shift_date 
-   cdate = header['DATE']
-   if float(cdate[0:8]) < float(shift_date)   :
-       radar.azimuth['data'] = radar.azimuth['data'] + shift_az 
+   if correct_az :
+      cdate = header['DATE']
+      if float(cdate[0:8]) < float(shift_date)   :
+         radar.azimuth['data'] = radar.azimuth['data'] + shift_az 
 
    # Let's work on the field data, we will just do reflectivity for now, but any of the
    # other fields can be done the same way and added as a key pair in the fields dict.

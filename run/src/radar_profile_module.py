@@ -172,8 +172,8 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
       my_profile['date'].append( date )
 
       my_profile['z_nn_profile'].append( nn_alt )
-      my_profile['z_nn_ref'].append( nn_ref )
-      my_profile['z_nn_elev'].append( nn_elev )
+      my_profile['ref_nn_profile'].append( nn_ref )
+      my_profile['elev_nn_profile'].append( nn_elev )
 
    return my_profile
 
@@ -237,16 +237,12 @@ def extract_profile_data( filename , radius , lonp , latp , lonradar , latradar 
 
     for ie,my_elev in enumerate( unique_elevs ) :
         my_mask = elevations == my_elev
-        my_ref  = radar.fiedls['reflectivity']['data'][my_mask,:] 
+        my_ref  = radar.fields['reflectivity']['data'][my_mask,:] 
         my_z    = radar.gate_z['data'][my_mask,:]
         my_dist = distancia[my_mask,:]
         [minx , miny] = np.where( my_dist == np.min( my_dist ) )
         ref_nn[ie] = np.copy( my_ref[minx,miny] )
-        alt_nn[ie] = np.copy( my_z[minx,miny] )         
+        alt_nn[ie] = np.copy( my_z[minx,miny] )       
 
     return ref , alt , elev , date , ref_nn , alt_nn , unique_elevs 
-
-
-
-
 
