@@ -113,6 +113,20 @@ def get_filelist( ini_date , end_date , data_path , name_filter=None , sufix='.z
 
 
 def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radius ) :
+   #Esta funcion ingresa la lon y lat de un punto en el area del radar.
+   #La funcion toma un cilindro de radio "radius" alrededor del punto lonp,latp y 
+   #genera un perfil de reflectividad promedio (de los puntos en el interior del cilindro)
+   #El perfil se genera con una cierta resolucion espacial (dz=500 m por defecto) y 
+   #por defecto para todas las alturas entre 0 y 15000 metros.
+   #El perfil se guarda en un diccionario cuyas entradas incluyen:
+   #z_th_profile , la altura sobre el terreno
+   #meanref_th_profile , la reflectividad media a cada altura
+   #stdref_th_profile , la desviacion estandard de la reflectividad a cada altura
+   #calculada sobre todos los puntos que fueron usados para obtener el valor de reflectividad a una altura determinada
+   #maxref_th_profile , la maxima reflectividad detectada a una determinada altura
+   #minref_th_profile , la minimia reflectvidad detectada
+   #num_th_profile , la cantidad de valores de reflectividad promediados para cada altura.
+   #date , un objeto fecha de python indicando la hora a la que fue tomado el volumen.
 
    my_profile = dict()
    
@@ -130,7 +144,9 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
    for ifile,my_file in enumerate( filelist ) :
       #print('Reading ',my_file)
 
-      [ref , alt , elev , date ] = extract_profile_data( my_file , radius , lonp , latp , lonradar , latradar , altradar ) 
+      #Esta funcion devuelve todos los puntos que estan dentro del cilindro (ref,alt,elev)
+      #Tambien devuelve el perfil de vecinos mas cercanos nn_ref , nn_alt y nn_elev
+      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , radius , lonp , latp , lonradar , latradar , altradar ) 
 
       [zp , meanp , stdp , minp , maxp , nump] = grid_profile( ref , alt )
    
@@ -142,6 +158,9 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
          my_profile['maxref_th_profile']  = np.zeros( (nz , nfiles) )  
          my_profile['minref_th_profile']  = np.zeros( (nz , nfiles) )
          my_profile['num_th_profile']     = np.zeros( (nz , nfiles) )
+         my_profile['z_nn_profile']       = list()
+         my_profile['ref_nn_profile']     = list()
+         my_profile['elev_nn_profile']    = list()
          my_profile['date']               = list()
 
       my_profile['z_th_profile'][:,ifile]       = zp
@@ -151,6 +170,10 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
       my_profile['minref_th_profile'][:,ifile]  = minp
       my_profile['num_th_profile'][:,ifile]     = nump
       my_profile['date'].append( date )
+
+      my_profile['z_nn_profile'].append( nn_alt )
+      my_profile['z_nn_ref'].append( nn_ref )
+      my_profile['z_nn_elev'].append( nn_elev )
 
    return my_profile
 
@@ -186,7 +209,7 @@ def extract_profile_data( filename , radius , lonp , latp , lonradar , latradar 
     
     radar = rr.rvd_read( filename , lonradar , latradar , altradar )
 
-    # Buscamos los puntos que estan en el cilindro
+    # Buscamos los puntos que estan en el cilindro y calculamos el perfil medio sobre el cilindro.
     dlon =  np.cos(radar.gate_latitude['data']*np.pi/180.0)*( radar.gate_longitude['data'] - lonp )    
     dlat =  ( radar.gate_latitude['data'] - latp )
     distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
@@ -202,10 +225,26 @@ def extract_profile_data( filename , radius , lonp , latp , lonradar , latradar 
 
     alt  = radar.gate_z['data'][ mascara ]
 
-    return ref , alt , elev , date 
+    #Buscamos los puntos que son el vecino mas cercano (nn) del punto seleccionado en cada ppi para
+    #construir el perfil de vecinos mas cercanos. 
 
+    elevations = radar.elevation['data']
+    unique_elevs = np.unique( elevations ) 
+    nelevs = np.size( unique_elevs )
+    
+    ref_nn = np.zeros( nelevs )
+    alt_nn = np.zeros( nelevs )
 
+    for ie,my_elev in enumerate( unique_elevs ) :
+        my_mask = elevations == my_elev
+        my_ref  = radar.fiedls['reflectivity']['data'][my_mask,:] 
+        my_z    = radar.gate_z['data'][my_mask,:]
+        my_dist = distancia[my_mask,:]
+        [minx , miny] = np.where( my_dist == np.min( my_dist ) )
+        ref_nn[ie] = np.copy( my_ref[minx,miny] )
+        alt_nn[ie] = np.copy( my_z[minx,miny] )         
 
+    return ref , alt , elev , date , ref_nn , alt_nn , unique_elevs 
 
 
 
