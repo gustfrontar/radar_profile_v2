@@ -13,7 +13,7 @@ from src import rvd_read as rr
 from datetime import datetime as dt
 from datetime import timedelta
 import gc 
-from tqdm import tqdm
+#from tqdm import tqdm
 
 
 def get_stations( database_file ) :
@@ -127,7 +127,7 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
    
    nfiles = len( filelist )
 
-   for ifile,my_file in tqdm( enumerate( filelist ) ) :
+   for ifile,my_file in enumerate( filelist ) :
       #print('Reading ',my_file)
 
       [ref , alt , elev , date ] = extract_profile_data( my_file , radius , lonp , latp , lonradar , latradar , altradar ) 
