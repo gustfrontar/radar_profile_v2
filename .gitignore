@@ -1,0 +1,12 @@
+*.dat
+*.png
+*.npz
+*.txt
+*.pyc
+*.so
+*.rvd
+*.nc
+*.h5
+*.bufr
+*.gif
+
