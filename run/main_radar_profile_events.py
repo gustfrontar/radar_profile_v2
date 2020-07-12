@@ -60,7 +60,7 @@ for ievent , my_event in enumerate( cases_dict['date'] ) :
 
       #Guardamos el perfil medio sobre el cilindro. 
       pickle_file = output_path + '/event_profiles_' + cases_dict['ID'][ievent] + '_' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + '.pkl'
-      pkl.dump( event_th_mean_profile , open( pickle_file , "wb" ) )
+      pkl.dump( event_profiles , open( pickle_file , "wb" ) )
 
 
    #event_th_nn_profile = ..... #Este seria el perfil del vecino mas cercano (nn).    
