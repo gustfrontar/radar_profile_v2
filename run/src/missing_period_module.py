@@ -1,3 +1,5 @@
+import numpy as np
+
 def get_missing_periods( data , delta_t_max ) :
    #Hacemos un resumen de los datos faltantes.
    dt_max = timedelta( minutes = delta_t_max )    #Este es el maximo dt que toleramos entre 2 volumenes.
