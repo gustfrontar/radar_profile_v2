@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Jun 28 19:33:33 2020
+
+@author: juan
+"""
+
 import numpy as np
 
 def get_missing_periods( data , delta_t_max ) :
