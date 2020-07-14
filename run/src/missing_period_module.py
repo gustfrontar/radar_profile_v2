@@ -5,7 +5,6 @@ Created on Sun Jun 28 19:33:33 2020
 
 @author: juan
 """
-
 import numpy as np
 from datetime import datetime as dt
 from datetime import timedelta
