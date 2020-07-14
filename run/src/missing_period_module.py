@@ -7,6 +7,8 @@ Created on Sun Jun 28 19:33:33 2020
 """
 
 import numpy as np
+from datetime import datetime as dt
+from datetime import timedelta
 
 def get_missing_periods( data , delta_t_max ) :
    #Hacemos un resumen de los datos faltantes.
