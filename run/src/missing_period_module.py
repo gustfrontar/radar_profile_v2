@@ -53,8 +53,8 @@ def add_missing_periods( data , delta_t_max ) :
    dt_add = timedelta( minutes = 1.0 )
 
    data['meanref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
-   data['maxnref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
-   data['minnref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
+   data['maxref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
+   data['minref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
    data['stdref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
    data['num_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
 
@@ -73,8 +73,8 @@ def add_missing_periods( data , delta_t_max ) :
              data['date_ext'].append( data['datedt'][it] - dt_add )
 
       data['meanref_th_profile_ext'][:,it+dindex] = data['meanref_th_profile'][:,it]
-      data['maxnref_th_profile_ext'][:,it+dindex] = data['maxref_th_profile'][:,it]
-      data['minnref_th_profile_ext'][:,it+dindex] = data['minref_th_profile'][:,it]
+      data['maxref_th_profile_ext'][:,it+dindex] = data['maxref_th_profile'][:,it]
+      data['minref_th_profile_ext'][:,it+dindex] = data['minref_th_profile'][:,it]
       data['stdref_th_profile_ext'][:,it+dindex] = data['stdref_th_profile'][:,it]
       data['num_th_profile_ext'][:,it+dindex] = data['num_th_profile'][:,it]
 
@@ -86,5 +86,3 @@ def add_missing_periods( data , delta_t_max ) :
 
 
    return data
-
-
