@@ -11,12 +11,18 @@ output_path           = '../pkl/'
 dt_ini = timedelta(hours=15.0)  #ancho del evento en horas. Un evento lo vamos a definir como las 9 horas anteriores y las 3 horas
 dt_end = timedelta(hours=9.0)  #posteriores a la hora del acumulado (-3horas)
 
-latradar = -34.787778
-lonradar = -58.536667
-altradar = 30          # m
+conf=dict()
+conf['latradar']=-34.787778
+conf['lonradar']=-58.536667
+conf['altradar']=30
+conf['radius']=10000.0          #Este es el radio del cilindro que se toma alrededor de la estacion y sobre el cual se promedia la reflectividad.
+conf['min_ref_profile']=5.0     #Los valores de reflecividad por debajo de este valor no van a ser considerados en el calculo del perfil vertical de reflectividad.
+conf['min_ref_etop']=10.0       #Este es el valor de reflectividad usado para el calculo del echotop (y del VILD)
+conf['z_min']=0.0               #La altura minima donde arranca el perfil.
+conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
+conf['delta_z']=500.0           #La resolucion vertical del perfil.
+conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
 
-# Radio del cilindro en metros
-profile_radius = 10000.0
 
 #Cargo la base de datos de las estaciones.
 station_dict = rpm.get_stations( station_database_file )
@@ -33,17 +39,17 @@ for ievent , my_event in enumerate( cases_dict['date'] ) :
    event_end_date = dt.strftime( event_date + dt_end , '%Y%m%d%H' )
    
    #Busco la lista de archivos que necesito leer para este evento.
-   event_file_list = rpm.get_filelist( event_ini_date , event_end_date , radar_data_path , name_filter=['cz240p1'] , sufix='.z.rvd' , data_order='RVD' ) 
+   conf['filelist'] = rpm.get_filelist( event_ini_date , event_end_date , radar_data_path , name_filter=['cz240p1','cz240p0'] , sufix='.z.rvd' , data_order='RVD' ) 
 
-   print( cases_dict['ID'][ievent]+' , '+dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' )+' , '+str(len(event_file_list)) )
+   print( cases_dict['ID'][ievent] + ' , ' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + ' , ' + str(len( conf['filelist']  )) )
 
-   if len(event_file_list) > 0 :
+   if len( conf['filelist'] ) > 0 :
       #Identifico la longitud y latitud del evento.
-      event_lon = float( station_dict[ cases_dict['ID'][ievent] ]['lon'] )
-      event_lat = float( station_dict[ cases_dict['ID'][ievent] ]['lat'] )
+      conf['lon'] = float( station_dict[ cases_dict['ID'][ievent] ]['lon'] )
+      conf['lat'] = float( station_dict[ cases_dict['ID'][ievent] ]['lat'] )
 
       #Caclulo el perfil vertical de la reflectividad en base a la lista que encontre.
-      event_profiles = rpm.get_profiles( event_file_list , lonradar , latradar , altradar , event_lon , event_lat , profile_radius )
+      event_profiles = rpm.get_profiles( conf )
    
       #Agregamos algo de metadata al diccionario que contiene el perfil promediado sobre el cilindro.
       event_profiles['ini_date'] = event_ini_date

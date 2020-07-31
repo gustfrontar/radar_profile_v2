@@ -117,7 +117,8 @@ ID, DATE , NFILES
 87593 , 2018051106 , 0
 87553 , 2018092918 , 7
 87573 , 2018111018 , 53
-Traceback (most recent call last):
-  File "main_radar_profile_events.py", line 42, in <module>
-    event_lon = float( station_dict[ cases_dict['ID'][ievent] ]['lon'] )
-KeyError: '87573'
+87593 , 2018111100 , 20
+87585 , 2018121712 , 0
+87574 , 2018121712 , 0
+87573 , 2018121712 , 0
+87571 , 2018121712 , 0

@@ -58,7 +58,7 @@ def get_cases( database_file )  :
 
     return cases_dict
 
-def get_filelist( ini_date , end_date , data_path , name_filter=None , sufix='.z.rvd' , data_order='RVD' )  :
+def get_filelist( ini_date , end_date , data_path , name_filter=None , sufix='.z.rmvd' , data_order='RVD' )  :
     #Inidate esta en el formato YYYYMMDDHHmm
     #Enddate esta en el formato YYYYMMDDHHmm
 
@@ -82,19 +82,23 @@ def get_filelist( ini_date , end_date , data_path , name_filter=None , sufix='.z
        my_filelist = list()
        for my_date_folder in date_folder_list :
 
-          my_path = data_path + '/' + str( my_date_folder.year ) + '/' + dt.strftime( my_date_folder , '%Y%m%d' ) + '/rvd/' 
+          my_path = data_path + '/' + str( my_date_folder.year ) + '/' + dt.strftime( my_date_folder , '%Y%m%d' ) + '/*/' 
           tmp_filelist = glob.glob(my_path + '*' + sufix )
+          #For some dates there is no /rvd/ folder 
+          my_path = data_path + '/' + str( my_date_folder.year ) + '/' + dt.strftime( my_date_folder , '%Y%m%d' ) + '/'
+          tmp_filelist = tmp_filelist +  glob.glob(my_path + '*' + sufix ) 
+
           tmp_filelist_cp = tmp_filelist.copy()
-          
+
           #Chequeamos si los archivos que encontramos en esta carpeta estan dentro del rango. 
           for my_file in tmp_filelist :
-              my_filename = os.path.basename(my_file )
+
+              my_filename = os.path.basename( my_file )
                          
               if name_filter is not None :
                 if not any(my_filter in my_filename for my_filter in name_filter ) :
                     tmp_filelist_cp.remove( my_file )
                     continue 
-              #print(my_filename)
 
               tmp_date = dt.strptime( my_filename[12:20] + my_filename[21:25] , '%Y%m%d%H%M' )
               if tmp_date > end_date_dt or tmp_date < ini_date_dt :
@@ -103,16 +107,14 @@ def get_filelist( ini_date , end_date , data_path , name_filter=None , sufix='.z
           my_filelist = my_filelist + tmp_filelist_cp 
 
        my_filelist.sort()
-       #print(my_filelist)
 
     else :
-       print('Data order not recognized :( ')
+       arint('Data order not recognized :( ')
        my_filelist=list()
 
     return my_filelist
 
-
-def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radius ) :
+def get_profiles( conf ) : #filelist , lonradar , latradar , altradar , lonp , latp , radius ) :
    #Esta funcion ingresa la lon y lat de un punto en el area del radar.
    #La funcion toma un cilindro de radio "radius" alrededor del punto lonp,latp y 
    #genera un perfil de reflectividad promedio (de los puntos en el interior del cilindro)
@@ -129,26 +131,19 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
    #date , un objeto fecha de python indicando la hora a la que fue tomado el volumen.
 
    my_profile = dict()
-   
-   my_profile['lon'] = lonp
-   my_profile['lat'] = latp
-   my_profile['radius'] = radius
-   my_profile['lonradar'] = lonradar
-   my_profile['latradar'] = latradar
-   my_profile['altradar'] = lonradar
-   my_profile['file_list'] = filelist   
-   
-   
-   nfiles = len( filelist )
 
-   for ifile,my_file in enumerate( filelist ) :
+   my_profiles = conf.copy
+   
+   nfiles = len( conf['filelist'] )
+
+   for ifile,my_file in enumerate( conf['filelist'] ) :
       #print('Reading ',my_file)
 
       #Esta funcion devuelve todos los puntos que estan dentro del cilindro (ref,alt,elev)
       #Tambien devuelve el perfil de vecinos mas cercanos nn_ref , nn_alt y nn_elev
-      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , radius , lonp , latp , lonradar , latradar , altradar ) 
+      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
 
-      [zp , meanp , stdp , minp , maxp , nump] = grid_profile( ref , alt )
+      [zp , meanp , stdp , minp , maxp , nump, etop , vil , vild] = grid_profile( ref , alt , conf )
    
       if ifile == 0 :
          nz = np.size( zp ) 
@@ -165,6 +160,9 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
          my_profile['ref_nn_profile']     = list()
          my_profile['elev_nn_profile']    = list()
          my_profile['date']               = list()
+         my_profile['etop']               = np.zeros( nfiles )
+         my_profile['vil']                = np.zeros( nfiles )
+         my_profile['vild']               = np.zeros( nfiles )
 
 
       my_profile['z_th_profile'][:,ifile]       = zp
@@ -180,11 +178,22 @@ def get_profiles( filelist , lonradar , latradar , altradar , lonp , latp , radi
       my_profile['z_nn_profile'].append( nn_alt )
       my_profile['ref_nn_profile'].append( nn_ref )
       my_profile['elev_nn_profile'].append( nn_elev )
+      my_profile['etop'][ifile] = etop
+      my_profile['vil'][ifile]  = vil
+      my_profile['vild'][ifile] = vild
 
    return my_profile
 
 
-def grid_profile( ref , z , z_min=0.0 , z_max=15000.0 , delta_z = 500.0 , undef = -32.0 ) :
+def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.0 , undef = -32.0 ) :
+
+
+   z_min = conf['z_min']
+   z_max = conf['z_max']
+   delta_z = conf['delta_z']
+   undef = conf['undef']
+   min_ref = conf['min_ref_profile']
+   min_ref_etop = conf['min_ref_etop']
 
    zp = np.arange( z_min + delta_z / 2.0 , z_max + delta_z / 2.0 , delta_z )
    zp_min = np.arange( z_min , z_max , delta_z )
@@ -197,10 +206,10 @@ def grid_profile( ref , z , z_min=0.0 , z_max=15000.0 , delta_z = 500.0 , undef 
    maxp = np.copy(meanp)
    nump = np.zeros(nbin)   
 
-   z[z==undef] = np.nan
+   #ref[ref==undef] = np.nan
 
    for ii in range( nbin ) :
-       my_mask = ( z <= zp_max[ii] ) & ( z >= zp_min[ii] ) & ( ~ np.isnan( z ) )
+       my_mask = ( z <= zp_max[ii] ) & ( z >= zp_min[ii] ) & ( ~ np.isnan( ref ) )  & ( ref > min_ref ) & ( ref != undef )
        tmp_num = np.sum( my_mask )
        if  tmp_num > 30 :
           meanp[ii] = np.mean( ref[my_mask] )
@@ -209,19 +218,41 @@ def grid_profile( ref , z , z_min=0.0 , z_max=15000.0 , delta_z = 500.0 , undef 
           maxp[ii]  = np.max ( ref[my_mask] )
           nump[ii]  = tmp_num
 
-   return zp , meanp , stdp , minp , maxp , nump
+   #Detect the highest echo top
+   etop = np.nan  #Echo top
+   vil  = np.nan  #Vertically integrated liquid
+   vild = np.nan  #VIL density
+   for ii in range( nbin -1 )  :
+       if ( meanp[ii+1] < min_ref_etop ) & ( meanp[ii] >= min_ref_etop ) :
+          etop = zp[ii] 
 
-def extract_profile_data( filename , radius , lonp , latp , lonradar , latradar , altradar ) :
+       if ~ np.isnan( meanp[ii+1] ) & ~ np.isnan( meanp[ii] ) :
+          tmp_z_mean = 0.5 * (meanp[ii+1] + meanp[ii])
+          if tmp_z_mean > 56.0 :
+             tmp_z_mean = 56.0
+          vil_inc = 3.44e-6 * ( ( tmp_z_mean )**(4.0/7.0) ) * delta_z
+          if np.isnan( vil ) :
+             vil = vil_inc
+          else               :
+             vil = vil + vil_inc
+   if ~ np.isnan( etop ) & ~ np.isnan( vil ) :
+       vild = 1000.0 * vil / etop 
+
+   
+
+   return zp , meanp , stdp , minp , maxp , nump , etop , vil , vild
+
+def extract_profile_data( filename , conf ) : #radius , lonp , latp , lonradar , latradar , altradar ) :
     
-    radar = rr.rvd_read( filename , lonradar , latradar , altradar )
+    radar = rr.rvd_read( filename , conf['lonradar'] , conf['latradar'] , conf['altradar'] )
 
     # Buscamos los puntos que estan en el cilindro y calculamos el perfil medio sobre el cilindro.
-    dlon =  np.cos(radar.gate_latitude['data']*np.pi/180.0)*( radar.gate_longitude['data'] - lonp )    
-    dlat =  ( radar.gate_latitude['data'] - latp )
+    dlon =  np.cos(radar.gate_latitude['data']*np.pi/180.0)*( radar.gate_longitude['data'] - conf['lon'] )    
+    dlat =  ( radar.gate_latitude['data'] - conf['lat'] )
     distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
     date = radar.metadata['start_datetime']
 
-    mascara = distancia <= radius 
+    mascara = distancia <= conf['radius'] 
 
     elevations= np.tile( radar.elevation['data'] , (radar.fields['reflectivity']['data'].shape[1] ,1 )).transpose()
 
