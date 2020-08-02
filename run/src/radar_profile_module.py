@@ -194,6 +194,7 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    undef = conf['undef']
    min_ref = conf['min_ref_profile']
    min_ref_etop = conf['min_ref_etop']
+   
 
    zp = np.arange( z_min + delta_z / 2.0 , z_max + delta_z / 2.0 , delta_z )
    zp_min = np.arange( z_min , z_max , delta_z )
@@ -211,7 +212,7 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    for ii in range( nbin ) :
        my_mask = ( z <= zp_max[ii] ) & ( z >= zp_min[ii] ) & ( ~ np.isnan( ref ) )  & ( ref > min_ref ) & ( ref != undef )
        tmp_num = np.sum( my_mask )
-       if  tmp_num > 30 :
+       if  tmp_num > 0 :
           meanp[ii] = np.mean( ref[my_mask] )
           stdp[ii]  = np.std ( ref[my_mask] )
           minp[ii]  = np.min ( ref[my_mask] )
