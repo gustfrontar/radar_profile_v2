@@ -1,3 +1,5 @@
+#TODO Agregar la media local, el calculo del VIL y la interpolacion a una reticula comun.
+
 # =============================================================================
 
 import numpy as np

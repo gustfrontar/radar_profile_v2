@@ -22,6 +22,7 @@ conf['z_min']=0.0               #La altura minima donde arranca el perfil.
 conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
 conf['delta_z']=500.0           #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
+conf['vil_threshold']=5.0       #Valor de VIL a partir del cual los perfiles son incorporados. 
 
 
 #Cargo la base de datos de las estaciones.

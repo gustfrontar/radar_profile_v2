@@ -7,12 +7,11 @@ Created on Sun Jun 28 19:33:33 2020
 """
 import os
 import glob
-import scipy.io as sio
 import numpy as np
 from src import rvd_read as rr 
 from datetime import datetime as dt
 from datetime import timedelta
-import gc 
+
 #from tqdm import tqdm
 
 
@@ -141,7 +140,10 @@ def get_profiles( conf ) : #filelist , lonradar , latradar , altradar , lonp , l
 
       #Esta funcion devuelve todos los puntos que estan dentro del cilindro (ref,alt,elev)
       #Tambien devuelve el perfil de vecinos mas cercanos nn_ref , nn_alt y nn_elev
-      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
+      #[ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
+
+      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data_interp( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
+
 
       [zp , meanp , stdp , minp , maxp , nump, etop , vil , vild] = grid_profile( ref , alt , conf )
    
@@ -283,6 +285,289 @@ def extract_profile_data( filename , conf ) : #radius , lonp , latp , lonradar ,
         alt_nn[ie] = np.copy( my_z[minx,miny] )       
 
     return ref , alt , elev , date , ref_nn , alt_nn , unique_elevs 
+
+
+def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lonradar , latradar , altradar ) :
+    #Esta version de la funcion primero interpola todos los datos a la posicion de los 
+    #pixeles en el nivel mas bajo. Luego define ahi el punto mas cercano y los puntos que caen en el area del 
+    #cilindro. Tambien usa el VIL para determinar que perfiles se retienen y cuales no. 
+    undef = conf['undef']
+    
+    radar = rr.rvd_read( filename , conf['lonradar'] , conf['latradar'] , conf['altradar'] )
+    
+    [dbz3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'dBZ' , undef )  
+    [lon3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'lon' , undef )  
+    [lat3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'lat' , undef ) 
+    [z3d , azimuth , levels , time , azimuthe ]   = order_variable ( radar , 'altitude' , undef )
+    
+    #Dbz_int y z_int es la reflectividad y la altura interpoladas a la reticula del angulo de elevacion
+    #mas bajo. De manera que ahora los puntos correspondientes a las diferentes elevaciones son coincidentes
+    #en la vertical. 
+    tmp_lon = lon3d - conf['lonradar'] #Estas variables sirven para tener un sistema de referencia centrado en el radar.
+    tmp_lat = lat3d - conf['latradar']
+    [vil_int , dbz_int , z_int ] = calcula_vil( dbz3d , tmp_lon , tmp_lat , z3d , undef )  
+
+    # Buscamos los puntos que estan en el cilindro y calculamos el perfil medio sobre el cilindro.    
+    dlon =  np.cos( lat3d[:,:,0]*np.pi/180.0)*( lon3d[:,:,0] - conf['lon'] )
+    dlat =  ( lat3d[:,:,0] - conf['lat'] )
+    distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
+    date = radar.metadata['start_datetime']
+
+    mascara = np.logical_and( distancia <= conf['radius'] and vil_int > conf['vil_threshold'] )  
+
+    mascara = np.tile( mascara , (np.shape(dbz_int)[2],1,1) )   
+    mascara = np.moveaxis( mascara , 0 , -1 )
+    
+    lev3d=np.zeros( dbz3d.shape )
+    for ie in range( levels.size  ) :
+        lev3d[:,:,ie] = levels[ie]                      
+
+    ref  = dbz_int[ mascara ]
+    elev = lev3d[ mascara ]
+    alt  = z_int[ mascara ]
+
+    #Buscamos los puntos que son el vecino mas cercano (nn) del punto seleccionado en cada ppi para
+    #construir el perfil de vecinos mas cercanos. 
+
+    [minx , miny] = np.where( distancia == np.min( distancia ) )
+    
+    ref_nn = np.copy( dbz_int[minx,miny,:] )
+    alt_nn = np.copy( z_int[minx,miny,:] )
+
+    return ref , alt , elev , date , ref_nn , alt_nn , levels
+
+
+def local_mean( array , kernel_x , kernel_y , undef ) :
+    #Asumimos que hay condiciones ciclicas en el axis 0 pero no en el 1.
+    #array es el array de datos de entrada
+    #kernel_x es cual es el desplazamiento maximo (hacia cada lado) en la direccion de x
+    #kernel_y es cual es el desplazamiento maximo (hacia cada lado) en la direccion de y
+    #undef son los valores invalidos en el array de entrada.
+
+    [nx,ny]=np.shape(array)
+    arraym = np.zeros( np.shape(array) )
+    countm = np.zeros( np.shape(array) )
+    for ix in range(-kernel_x,kernel_x+1) :
+        for iy in range(-kernel_y,kernel_y +1) :
+          tmp_array = np.zeros( np.shape(array) )
+          if iy > 0 :
+             tmp_array[:,0+iy:] = array[:,0:-iy]
+          if iy == 0 :
+             tmp_array = np.copy(array)
+          if iy < 0 :
+             tmp_array[:,0:iy] = array[:,-iy:]
+          tmp_array=np.roll( tmp_array , ix , axis=0 )
+          mask = tmp_array != undef
+          arraym[ mask ] = arraym[mask] + tmp_array[mask]
+          countm[ mask ] = countm[mask] + 1
+    mask = countm > 0
+    arraym[mask] = arraym[mask] / countm[mask]
+    arraym[~mask] = undef 
+
+    return arraym
+
+
+def calcula_vil( dbz_in , x_in , y_in , z_in , undef )  :
+  from scipy.interpolate import interp1d
+  dbz = np.copy(dbz_in)
+  x   = np.copy(x_in)
+  y   = np.copy(y_in)
+  z   = np.copy(z_in)
+
+  [na,nr,ne] = dbz.shape
+
+  dbz_int = np.zeros( dbz.shape )
+  z_int   = np.zeros( dbz.shape )
+  vil_int     = np.zeros( (na , nr) )
+
+  ranger = ( x**2 + y**2 )**0.5
+  ranger0 = ranger[:,:,0]
+
+  #Calculo el VIL en la reticula x0 , y0
+  for ie in range(ne)   :
+    dbz2d = np.copy( dbz[:,:,ie] )
+    dbz2d_mean = local_mean( dbz2d , 1 , 1 , undef )
+    #Intento salvar algunos agujeros que pueda haber en el campo de reflectividad.
+    mask = np.logical_or( dbz2d == undef , dbz2d < 0.0 )
+    dbz2d[ mask ] = dbz2d_mean[mask]
+    #Los undef que quedaron pasan a ser 0 para el calcuo del VIL 
+    dbz2d[dbz2d == undef ] = 0.0  
+    dbz2d = 10 ** (  dbz2d / 10.0 )
+      
+    for ia in range(na)   :
+      
+      interpolator = interp1d(ranger[ia,:,ie] , dbz2d[ia,:] , kind='linear' , bounds_error = False , fill_value = 0.0 )
+      dbz_int[ia,:,ie] = interpolator(ranger0[ia,:])
+      interpolator = interp1d(ranger[ia,:,ie] , z[ia,:,ie] , kind='linear' , bounds_error = False , fill_value = np.nan)
+      z_int[ia,:,ie] = interpolator(ranger0[ia,:])
+      #Completo algunos niveles repitiendo el ultimo valor para hacer mas robusto el calculo del VIL
+    if ie > 0 :
+      dz = z_int[:,:,ie] - z_int[:,:,ie-1] ; dz[dz==0] = np.nan
+      vil_inc = 3.44e-6 * ( ( 0.5*(dbz_int[:,:,ie] + dbz_int[:,:,ie-1]) ) ** (4.0/7.0) ) * ( z_int[:,:,ie] - z_int[:,:,ie-1] )
+      vil_inc[np.isnan(vil_inc)] = 0.0 
+      vil_int = vil_int + vil_inc
+  #Hasta aca tenemos vil_int que es el vil en la reticula x0 y0. Para las cuentas en general nos puede venir bien
+  #tener el vil interpolado a la reticula x,y (es decir un vil definido para todoas las elevaciones del radar)
+  vil_int[ np.isnan(vil_int) ] = 0.0
+
+     
+  return vil_int , 10.0*np.log10(dbz_int) , z_int   
+
+
+def var_int( var_in , x_in , y_in , int_lev = 0 , fill_value = 0.0 ) :
+    from scipy.interpolate import interp1d
+    var = np.copy(var_in)
+    x   = np.copy(x_in)
+    y   = np.copy(y_in)
+
+    [na,nr,ne] = var.shape
+
+    var_int = np.zeros( var.shape )
+    ranger = ( x**2 + y**2 )**0.5
+    ranger0 = ranger[:,:,int_lev]
+
+    for ie in range(ne)   :
+       for ia in range(na)   :
+          interpolator = interp1d(ranger[ia,:,ie] , var[ia,:,ie] , kind='linear' , bounds_error = False , fill_value = 0.0 )
+          var_int[ia,:,ie] = interpolator(ranger0[ia,:])
+
+    return var_int 
+
+
+def order_variable ( radar , var_name , undef )  :  
+
+   import numpy as np
+   #import warnings 
+   #import matplotlib.pyplot as plt
+
+   #From azimuth , range -> azimuth , range , elevation 
+
+   if radar.ray_angle_res != None   :
+      #print( radar.ray_angle_res , radar.ray_angle_res == None )
+      ray_angle_res = np.unique( radar.ray_angle_res['data'] )
+   else                             :
+      print('Warning: ray_angle_res no esta definido, estimo la resolucion en radio como la diferencia entre los primeros angulos')
+      ray_angle_res = np.min( np.abs( radar.azimuth['data'][1:] - radar.azimuth['data'][0:-1] ) )
+      print('La resolucion en rango estimada es: ',ray_angle_res)
+
+
+   if( np.size( ray_angle_res ) >= 2 )  :
+      print('Warning: La resolucion en azimuth no es uniforme en los diferentes angulos de elevacion ')
+      print('Warning: El codigo no esta preparado para considerar este caso y puede producir efectos indeseados ')
+   ray_angle_res=np.nanmean( ray_angle_res )
+
+   levels=np.sort( np.unique(radar.elevation['data']) )
+   nb=radar.azimuth['data'].shape[0]
+
+   order_azimuth=np.arange(0.0,360.0,ray_angle_res) #Asuming a regular azimuth grid
+
+   na=np.size(order_azimuth)
+   ne=np.size(levels)
+   nr=np.size(radar.range['data'].data) 
+
+
+   var = np.ones( (nb,nr) )
+
+   if ( var_name == 'altitude' ) :
+       var[:]=radar.gate_altitude['data']  
+   elif( var_name == 'longitude' ) :
+       var[:]=radar.gate_longitude['data']
+   elif( var_name == 'latitude'  ) :
+       var[:]=radar.gate_latitude['data']
+   elif( var_name == 'x' )         :
+       var[:]=radar.gate_x['data']
+   elif( var_name == 'y' )         : 
+       var[:]=radar.gate_y['data']
+   else  :
+       var[:]=radar.fields[var_name]['data'].data
+
+
+   #Allocate arrays
+   order_var    =np.zeros((na,nr,ne))
+   order_time   =np.zeros((na,ne)) 
+   azimuth_exact=np.zeros((na,ne))
+   order_n      =np.zeros((na,nr,ne),dtype='int')
+   
+   current_lev = radar.elevation['data'][0]
+   ilev = np.where( levels == current_lev )[0]
+
+   for iray in range( 0 , nb )  :   #Loop over all the rays
+ 
+     #Check if we are in the same elevation.
+     if  radar.elevation['data'][iray] != current_lev  :
+         current_lev = radar.elevation['data'][iray]
+         ilev=np.where( levels == current_lev  )[0]
+
+     #Compute the corresponding azimuth index.
+     az_index = np.round( radar.azimuth['data'][iray] / ray_angle_res ).astype(int)
+     #Consider the case when azimuth is larger than na*ray_angle_res-(ray_angle_res/2)
+     if az_index >= na   :  
+        az_index = 0
+
+     tmp_var = var[iray,:]
+     undef_mask = tmp_var == undef 
+     tmp_var[ undef_mask ] = 0.0
+    
+     order_var [ az_index , : , ilev ] = order_var [ az_index , : , ilev ] + tmp_var
+     order_n   [ az_index , : , ilev ] = order_n   [ az_index , : , ilev ] + np.logical_not(undef_mask).astype(int)
+
+     order_time[ az_index , ilev ] = order_time[ az_index , ilev ] + radar.time['data'][iray]
+     azimuth_exact[ az_index , ilev ] = azimuth_exact[ az_index , ilev ] + radar.azimuth['data'][ iray ]
+
+   order_var[ order_n > 0 ] = order_var[ order_n > 0 ] / order_n[ order_n > 0 ]
+   order_var[ order_n == 0] = undef
+
+   return order_var , order_azimuth , levels , order_time , azimuth_exact
+
+def order_variable_inv (  radar , var , undef )  :
+
+   import numpy as np
+   
+   #From azimuth , range , elevation -> azimuth , range
+
+   na=var.shape[0]
+   nr=var.shape[1]
+   ne=var.shape[2]
+
+   nb=radar.azimuth['data'].shape[0]
+
+   levels=np.sort( np.unique(radar.elevation['data']) )
+
+   if radar.ray_angle_res != None   :
+      #print( radar.ray_angle_res , radar.ray_angle_res == None )
+      ray_angle_res = np.unique( radar.ray_angle_res['data'] )
+   else                             :
+      print('Warning: ray_angle_res no esta definido, estimo la resolucion en radio como la diferencia entre los primeros angulos')
+      ray_angle_res = np.min( np.abs( radar.azimuth['data'][1:] - radar.azimuth['data'][0:-1] ) )
+      print('La resolucion en rango estimada es: ',ray_angle_res)
+
+   if( np.size( ray_angle_res ) >= 2 )  :
+      print('Warning: La resolucion en azimuth no es uniforme en los diferentes angulos de elevacion ')
+      print('Warning: El codigo no esta preparado para considerar este caso y puede producir efectos indesaedos ')
+   ray_angle_res=np.nanmean( ray_angle_res )
+
+   current_lev = radar.elevation['data'][0]
+   ilev = np.where( levels == current_lev  )[0]
+
+   output_var = np.zeros((nb,nr) )
+   output_var[:] = undef
+
+   for iray in range( 0 , nb )  :   #Loop over all the rays
+
+      #Check if we are in the same elevation.
+      if  radar.elevation['data'][iray] != current_lev  :
+          current_lev = radar.elevation['data'][iray]
+          ilev=np.where( levels == current_lev  )[0]
+
+      #Compute the corresponding azimuth index.
+      az_index = np.round( radar.azimuth['data'][iray] / ray_angle_res ).astype(int)
+      #Consider the case when azimuth is larger than na*ray_angle_res-(ray_angle_res/2)
+      if az_index >= na   :
+         az_index = 0
+
+      output_var[ iray , : ] = var[ az_index , : , ilev ]
+
+   return output_var
 
 
 

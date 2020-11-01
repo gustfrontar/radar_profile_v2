@@ -22,7 +22,7 @@ conf['z_min']=0.0               #La altura minima donde arranca el perfil.
 conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
 conf['delta_z']=500.0           #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
-
+conf['vil_threshold']=5.0       #Valor de VIL a partir del cual los perfiles son incorporados. 
 
 radius = [ 100.0 , 250.0 , 500.0 , 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
 delta_z = [ 250.0, 500.0, 1000.0, 2000.0 ]
