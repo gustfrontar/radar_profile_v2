@@ -24,8 +24,8 @@ conf['delta_z']=500.0           #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
 conf['vil_threshold']=5.0       #Valor de VIL a partir del cual los perfiles son incorporados. 
 
-radius = [ 100.0 , 250.0 , 500.0 , 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
-delta_z = [ 250.0, 500.0, 1000.0, 2000.0 ]
+radius = [ 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
+delta_z = [ 1000.0, 2000.0 ]
 
 #Cargo la base de datos de las estaciones.
 station_dict = rpm.get_stations( station_database_file )

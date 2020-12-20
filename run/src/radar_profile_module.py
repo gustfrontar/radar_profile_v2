@@ -225,14 +225,17 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    etop = np.nan  #Echo top
    vil  = np.nan  #Vertically integrated liquid
    vild = np.nan  #VIL density
+
+   meanp_vil = np.copy( meanp )
+   meanp_vil[ meanp_vil > 56.0 ] = 56.0
+   meanp_vil = 10.0**( meanp_vil / 10.0 )
    for ii in range( nbin -1 )  :
        if ( meanp[ii+1] < min_ref_etop ) & ( meanp[ii] >= min_ref_etop ) :
           etop = zp[ii] 
 
        if ~ np.isnan( meanp[ii+1] ) & ~ np.isnan( meanp[ii] ) :
-          tmp_z_mean = 0.5 * (meanp[ii+1] + meanp[ii])
-          if tmp_z_mean > 56.0 :
-             tmp_z_mean = 56.0
+          
+          tmp_z_mean = 0.5 * (meanp_vil[ii+1] + meanp_vil[ii] )
           vil_inc = 3.44e-6 * ( ( tmp_z_mean )**(4.0/7.0) ) * delta_z
           if np.isnan( vil ) :
              vil = vil_inc
@@ -246,7 +249,7 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    return zp , meanp , stdp , minp , maxp , nump , etop , vil , vild
 
 def extract_profile_data( filename , conf ) : #radius , lonp , latp , lonradar , latradar , altradar ) :
-    
+	    
     radar = rr.rvd_read( filename , conf['lonradar'] , conf['latradar'] , conf['altradar'] )
 
     # Buscamos los puntos que estan en el cilindro y calculamos el perfil medio sobre el cilindro.
@@ -295,9 +298,9 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     
     radar = rr.rvd_read( filename , conf['lonradar'] , conf['latradar'] , conf['altradar'] )
     
-    [dbz3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'dBZ' , undef )  
-    [lon3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'lon' , undef )  
-    [lat3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'lat' , undef ) 
+    [dbz3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'reflectivity' , undef )  
+    [lon3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'longitude' , undef )  
+    [lat3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'latitude' , undef ) 
     [z3d , azimuth , levels , time , azimuthe ]   = order_variable ( radar , 'altitude' , undef )
     
     #Dbz_int y z_int es la reflectividad y la altura interpoladas a la reticula del angulo de elevacion
@@ -313,7 +316,9 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
     date = radar.metadata['start_datetime']
 
-    mascara = np.logical_and( distancia <= conf['radius'] and vil_int > conf['vil_threshold'] )  
+    mascara = np.logical_and( distancia <= conf['radius'] , vil_int > conf['vil_threshold'] )  
+
+    print( np.sum( distancia <= conf['radius'] ) , np.sum( vil_int > conf['vil_threshold'] ) , vil_int.max() )
 
     mascara = np.tile( mascara , (np.shape(dbz_int)[2],1,1) )   
     mascara = np.moveaxis( mascara , 0 , -1 )
@@ -410,8 +415,10 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef )  :
   #tener el vil interpolado a la reticula x,y (es decir un vil definido para todoas las elevaciones del radar)
   vil_int[ np.isnan(vil_int) ] = 0.0
 
+  dbz_int[ dbz_int <= 0.0 ]=1.0
+  dbz_int = 10.0*np.log10(dbz_int)
      
-  return vil_int , 10.0*np.log10(dbz_int) , z_int   
+  return vil_int , dbz_int , z_int   
 
 
 def var_int( var_in , x_in , y_in , int_lev = 0 , fill_value = 0.0 ) :
