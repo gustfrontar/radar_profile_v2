@@ -136,16 +136,16 @@ def get_profiles( conf ) : #filelist , lonradar , latradar , altradar , lonp , l
    nfiles = len( conf['filelist'] )
 
    for ifile,my_file in enumerate( conf['filelist'] ) :
-      #print('Reading ',my_file)
+      print('Reading ',my_file)
 
       #Esta funcion devuelve todos los puntos que estan dentro del cilindro (ref,alt,elev)
       #Tambien devuelve el perfil de vecinos mas cercanos nn_ref , nn_alt y nn_elev
       #[ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
 
-      [ref , alt , elev , date , nn_ref , nn_alt , nn_elev ] = extract_profile_data_interp( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
+      [ref , alt , elev , nn_ref , nn_alt , nn_vil , nn_elev , date ] = extract_profile_data_interp( my_file , conf ) #radius , lonp , latp , lonradar , latradar , altradar ) 
 
-
-      [zp , meanp , stdp , minp , maxp , nump, etop , vil , vild] = grid_profile( ref , alt , conf )
+      [zp , meanp , stdp , minp , maxp , nump, etop , vil , vild ] = grid_profile( ref , alt , conf )
+      
    
       if ifile == 0 :
          nz = np.size( zp ) 
@@ -183,6 +183,18 @@ def get_profiles( conf ) : #filelist , lonradar , latradar , altradar , lonp , l
       my_profile['etop'][ifile] = etop
       my_profile['vil'][ifile]  = vil
       my_profile['vild'][ifile] = vild
+      
+      # import matplotlib.pyplot as plt
+      # plt.figure(figsize=[24,8])
+
+      # plt.plot( my_profile['z_raw_profile'][-1] , my_profile['alt_raw_profile'][-1]/1000 ,'ko',alpha=0.3)
+      # plt.plot( my_profile['meanref_th_profile'][:,ifile] , my_profile['z_th_profile'][:,ifile]/1000 ,'-bo',label='mean')
+      # plt.plot( my_profile['ref_nn_profile'][-1]       , my_profile['z_nn_profile'][-1]/1000 ,'-ro',label='NeNe')
+      # plt.plot( my_profile['maxref_th_profile'][:,ifile]  , my_profile['z_th_profile'][:,ifile]/1000 ,'-go',label='Max')
+      # plt.plot( my_profile['minref_th_profile'][:,ifile]  , my_profile['z_th_profile'][:,ifile]/1000 ,'-go',label='Min')
+      # plt.plot( my_profile['meanref_th_profile'][:,ifile] + my_profile['stdref_th_profile'][:,ifile] , my_profile['z_th_profile'][:,ifile]/1000 ,'--b')
+      # plt.plot( my_profile['meanref_th_profile'][:,ifile] - my_profile['stdref_th_profile'][:,ifile] , my_profile['z_th_profile'][:,ifile]/1000 ,'--b')
+      # plt.show()
 
    return my_profile
 
@@ -215,7 +227,7 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
        my_mask = ( z <= zp_max[ii] ) & ( z >= zp_min[ii] ) & ( ~ np.isnan( ref ) )  & ( ref > min_ref ) & ( ref != undef )
        tmp_num = np.sum( my_mask )
        if  tmp_num > 0 :
-          meanp[ii] = np.mean( ref[my_mask] )
+          meanp[ii] = 10.0*np.log10( np.mean( 10.0**(ref[my_mask]/10.0) ) )
           stdp[ii]  = np.std ( ref[my_mask] )
           minp[ii]  = np.min ( ref[my_mask] )
           maxp[ii]  = np.max ( ref[my_mask] )
@@ -225,17 +237,15 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    etop = np.nan  #Echo top
    vil  = np.nan  #Vertically integrated liquid
    vild = np.nan  #VIL density
-
-   meanp_vil = np.copy( meanp )
-   meanp_vil[ meanp_vil > 56.0 ] = 56.0
-   meanp_vil = 10.0**( meanp_vil / 10.0 )
+   meanpower = 10.0 ** ( meanp / 10.0 )
    for ii in range( nbin -1 )  :
        if ( meanp[ii+1] < min_ref_etop ) & ( meanp[ii] >= min_ref_etop ) :
           etop = zp[ii] 
 
        if ~ np.isnan( meanp[ii+1] ) & ~ np.isnan( meanp[ii] ) :
-          
-          tmp_z_mean = 0.5 * (meanp_vil[ii+1] + meanp_vil[ii] )
+          tmp_z_mean = 0.5 * (meanpower[ii+1] + meanpower[ii])
+          if tmp_z_mean > 56.0 :
+             tmp_z_mean = 56.0
           vil_inc = 3.44e-6 * ( ( tmp_z_mean )**(4.0/7.0) ) * delta_z
           if np.isnan( vil ) :
              vil = vil_inc
@@ -297,18 +307,35 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     undef = conf['undef']
     
     radar = rr.rvd_read( filename , conf['lonradar'] , conf['latradar'] , conf['altradar'] )
+        
+    [dbz3d , azimuth , levels , time , azimuthe , npixdbz ] = order_variable ( radar , 'reflectivity' , undef )  
+    [lon3d , azimuth , levels , time , azimuthe , npix ] = order_variable ( radar , 'longitude' , undef )  
+    [lat3d , azimuth , levels , time , azimuthe , npix ] = order_variable ( radar , 'latitude' , undef ) 
+    [z3d , azimuth , levels , time , azimuthe , npix ]   = order_variable ( radar , 'altitude' , undef )
     
-    [dbz3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'reflectivity' , undef )  
-    [lon3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'longitude' , undef )  
-    [lat3d , azimuth , levels , time , azimuthe ] = order_variable ( radar , 'latitude' , undef ) 
-    [z3d , azimuth , levels , time , azimuthe ]   = order_variable ( radar , 'altitude' , undef )
-    
+    #Reemplazamos los nans que puedan haber en la reflectividad por undef.
+    dbz3d[np.isnan(dbz3d)] = undef 
+    dbz3d[dbz3d == 0.0 ]   = undef
+        
     #Dbz_int y z_int es la reflectividad y la altura interpoladas a la reticula del angulo de elevacion
     #mas bajo. De manera que ahora los puntos correspondientes a las diferentes elevaciones son coincidentes
     #en la vertical. 
     tmp_lon = lon3d - conf['lonradar'] #Estas variables sirven para tener un sistema de referencia centrado en el radar.
     tmp_lat = lat3d - conf['latradar']
-    [vil_int , dbz_int , z_int ] = calcula_vil( dbz3d , tmp_lon , tmp_lat , z3d , undef )  
+    [vil_int , etop_int , dbz_int , z_int ] = calcula_vil( dbz3d , tmp_lon , tmp_lat , z3d , undef )  
+    
+    #print( np.sum( radar.fields['reflectivity']['data'] == 0 ),np.sum( dbz3d==0.0 ) )
+    #import matplotlib.pyplot as plt
+    #print( np.max(vil_int[:,0:200]) , np.min(vil_int) )
+    #plt.pcolor(vil_int);plt.colorbar();plt.show()
+    #print( np.max(etop_int) , np.min(etop_int) )
+    #plt.pcolor(etop_int[:,0:200]);plt.colorbar();plt.show()
+    #plt.pcolor(dbz_int[210,0:200,:]);plt.contour(z_int[210,0:200,:],levels=[5000,10000,20000]);plt.colorbar();plt.show()
+    #plt.pcolor(dbz3d[210,0:200,:]);plt.contour(z3d[210,0:200,:],levels=[5000,10000,20000]);plt.colorbar();plt.show()
+    #plt.pcolor(z_int[210,0:200,:]);plt.colorbar();plt.show()
+
+    #print(np.sum(np.abs( dbz3d ) < 9.99997940e-10) , np.sum(np.abs( radar.fields['reflectivity']['data'] ) < 9.99997940e-10) ) 
+
 
     # Buscamos los puntos que estan en el cilindro y calculamos el perfil medio sobre el cilindro.    
     dlon =  np.cos( lat3d[:,:,0]*np.pi/180.0)*( lon3d[:,:,0] - conf['lon'] )
@@ -316,20 +343,19 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
     date = radar.metadata['start_datetime']
 
-    mascara = np.logical_and( distancia <= conf['radius'] , vil_int > conf['vil_threshold'] )  
+    mascara = np.logical_and( distancia <= conf['radius'] , vil_int > conf['vil_threshold'] ) 
+    mascara = np.logical_and( mascara , etop_int > conf['etop_threshold'] )
+    mascara = np.logical_and( mascara , dbz_int[:,:,0] > conf['lowref_threshold'] )
+    #mascara =  distancia <= conf['radius'] 
 
-    print( np.sum( distancia <= conf['radius'] ) , np.sum( vil_int > conf['vil_threshold'] ) , vil_int.max() )
+    mascara3d = np.repeat( mascara[:,:,np.newaxis],np.shape(dbz_int)[2],axis=2)
+    lev3d   = np.repeat( np.repeat( levels[np.newaxis,:],np.shape(dbz_int)[0],axis=0)[:,np.newaxis,:] ,np.shape(dbz_int)[1],axis=1)
 
-    mascara = np.tile( mascara , (np.shape(dbz_int)[2],1,1) )   
-    mascara = np.moveaxis( mascara , 0 , -1 )
-    
-    lev3d=np.zeros( dbz3d.shape )
-    for ie in range( levels.size  ) :
-        lev3d[:,:,ie] = levels[ie]                      
-
-    ref  = dbz_int[ mascara ]
-    elev = lev3d[ mascara ]
-    alt  = z_int[ mascara ]
+                    
+    ref  = dbz_int[ mascara3d ]
+    elev = lev3d[ mascara3d ]
+    alt  = z_int[ mascara3d ]
+    #vil  = vil_int[ mascara ]
 
     #Buscamos los puntos que son el vecino mas cercano (nn) del punto seleccionado en cada ppi para
     #construir el perfil de vecinos mas cercanos. 
@@ -338,8 +364,9 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     
     ref_nn = np.copy( dbz_int[minx,miny,:] )
     alt_nn = np.copy( z_int[minx,miny,:] )
+    vil_nn = np.copy( vil_int[minx,miny] )
 
-    return ref , alt , elev , date , ref_nn , alt_nn , levels
+    return ref , alt , elev , ref_nn , alt_nn , vil_nn , levels , date
 
 
 def local_mean( array , kernel_x , kernel_y , undef ) :
@@ -372,22 +399,31 @@ def local_mean( array , kernel_x , kernel_y , undef ) :
     return arraym
 
 
-def calcula_vil( dbz_in , x_in , y_in , z_in , undef )  :
+def calcula_vil( dbz_in , x_in , y_in , z_in , undef , etop_thresh=5.0 )  :
   from scipy.interpolate import interp1d
   dbz = np.copy(dbz_in)
   x   = np.copy(x_in)
   y   = np.copy(y_in)
   z   = np.copy(z_in)
+  
+  fill_value_power = 1.0e-10
 
   [na,nr,ne] = dbz.shape
 
   dbz_int = np.zeros( dbz.shape )
   z_int   = np.zeros( dbz.shape )
   vil_int     = np.zeros( (na , nr) )
+  etop_int    = np.zeros( (na , nr) )
+  
+  etop_init_mask = np.zeros( (na , nr) ).astype(bool)
+  etop_detected_mask = np.zeros( (na , nr) ).astype(bool)
+  
+  
+  
 
   ranger = ( x**2 + y**2 )**0.5
   ranger0 = ranger[:,:,0]
-
+  
   #Calculo el VIL en la reticula x0 , y0
   for ie in range(ne)   :
     dbz2d = np.copy( dbz[:,:,ie] )
@@ -396,29 +432,46 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef )  :
     mask = np.logical_or( dbz2d == undef , dbz2d < 0.0 )
     dbz2d[ mask ] = dbz2d_mean[mask]
     #Los undef que quedaron pasan a ser 0 para el calcuo del VIL 
-    dbz2d[dbz2d == undef ] = 0.0  
-    dbz2d = 10 ** (  dbz2d / 10.0 )
-      
+    #dbz2d[dbz2d == undef ] = fill_value_power  
+    dbz2d = 10.0 ** (  dbz2d / 10.0 )
+    dbz2d[ dbz[:,:,ie] == undef ] = fill_value_power
+              
     for ia in range(na)   :
       
-      interpolator = interp1d(ranger[ia,:,ie] , dbz2d[ia,:] , kind='linear' , bounds_error = False , fill_value = 0.0 )
+      interpolator = interp1d(ranger[ia,:,ie] , dbz2d[ia,:] , kind='linear' , bounds_error = False , fill_value = fill_value_power )
       dbz_int[ia,:,ie] = interpolator(ranger0[ia,:])
       interpolator = interp1d(ranger[ia,:,ie] , z[ia,:,ie] , kind='linear' , bounds_error = False , fill_value = np.nan)
       z_int[ia,:,ie] = interpolator(ranger0[ia,:])
       #Completo algunos niveles repitiendo el ultimo valor para hacer mas robusto el calculo del VIL
     if ie > 0 :
       dz = z_int[:,:,ie] - z_int[:,:,ie-1] ; dz[dz==0] = np.nan
-      vil_inc = 3.44e-6 * ( ( 0.5*(dbz_int[:,:,ie] + dbz_int[:,:,ie-1]) ) ** (4.0/7.0) ) * ( z_int[:,:,ie] - z_int[:,:,ie-1] )
+      vil_inc = 3.44e-6 * ( ( 0.5*(dbz_int[:,:,ie] + dbz_int[:,:,ie-1]) ) ** (4.0/7.0) ) * ( dz )
       vil_inc[np.isnan(vil_inc)] = 0.0 
       vil_int = vil_int + vil_inc
+
+    #Echo top computation      
+    etop_init_mask[ np.logical_and( dbz[:,:,ie] > etop_thresh , np.logical_not( etop_detected_mask ) ) ]=True
+    
+    if ie > 0 :
+        etop_detection_mask=np.logical_and( etop_init_mask , np.logical_or( dbz[:,:,ie] < etop_thresh , np.isnan(dbz[:,:,ie] ) ) )
+        etop_detected_mask[ etop_detection_mask ] = True
+        etop_int[ etop_detection_mask ] = ( z_int[:,:,ie] )[ etop_detection_mask ]
+        etop_init_mask[ etop_detected_mask ] = False
+    if ie == ne-1 :
+        etop_detection_mask=np.logical_and( etop_init_mask , dbz[:,:,ie] > etop_thresh )
+        etop_int[ etop_detection_mask ] = ( z_int[:,:,ie] )[ etop_detection_mask ]
+      
+      
+      
   #Hasta aca tenemos vil_int que es el vil en la reticula x0 y0. Para las cuentas en general nos puede venir bien
   #tener el vil interpolado a la reticula x,y (es decir un vil definido para todoas las elevaciones del radar)
   vil_int[ np.isnan(vil_int) ] = 0.0
-
-  dbz_int[ dbz_int <= 0.0 ]=1.0
-  dbz_int = 10.0*np.log10(dbz_int)
+  dbz_int_out = 10.0*np.log10(dbz_int)
+  dbz_int_out[ dbz_int == fill_value_power ] = undef 
+  
+  
      
-  return vil_int , dbz_int , z_int   
+  return vil_int , etop_int , dbz_int_out , z_int  
 
 
 def var_int( var_in , x_in , y_in , int_lev = 0 , fill_value = 0.0 ) :
@@ -511,7 +564,7 @@ def order_variable ( radar , var_name , undef )  :
      if az_index >= na   :  
         az_index = 0
 
-     tmp_var = var[iray,:]
+     tmp_var = np.copy(var[iray,:])
      undef_mask = tmp_var == undef 
      tmp_var[ undef_mask ] = 0.0
     
@@ -524,7 +577,7 @@ def order_variable ( radar , var_name , undef )  :
    order_var[ order_n > 0 ] = order_var[ order_n > 0 ] / order_n[ order_n > 0 ]
    order_var[ order_n == 0] = undef
 
-   return order_var , order_azimuth , levels , order_time , azimuth_exact
+   return order_var , order_azimuth , levels , order_time , azimuth_exact , order_n 
 
 def order_variable_inv (  radar , var , undef )  :
 
