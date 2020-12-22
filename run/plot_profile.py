@@ -127,7 +127,8 @@ for my_radius in radius :
       #==============================================================================#
       # GRAFICO REFLECTIVIDAD MEDIA EN FUNCION DE LA ALTURA Y EL TIEMPO
       #==============================================================================#
-      n_times=len( data['z_raw_profile'] )
+      n_times=len( data['z_raw_profile_ext'] )
+      altura_max = 5000.0 #La altura maxima para el calculo de la pendiente de la reflectividad.
       drefdz = np.zeros( n_times )  #La pendiente de reflectividad con la altura (primeros 5 km)
       drefdzs = np.zeros( n_times ) #Igual a la anterior pero con un suavizado temporal.
       maxref = np.zeros( n_times )  #La maxima reflectividad (primeros 5 km)
@@ -137,11 +138,11 @@ for my_radius in radius :
 
       for mytime in range( n_times ) :
          
-          tmp_ref = np.copy( data['z_raw_profile'][mytime] )
-          tmp_z   = np.copy( data['alt_raw_profile'][mytime]/1000 )
+          tmp_ref = np.copy( data['z_raw_profile_ext'][mytime] )
+          tmp_z   = np.copy( data['alt_raw_profile_ext'][mytime] )
           #Me quedo con los datos por debajo de 5 km.
-          tmp_ref = tmp_ref[ tmp_z < 5.0 ]
-          tmp_z   = tmp_z[ tmp_z < 5.0 ]
+          tmp_ref = tmp_ref[ tmp_z < altura_max ]
+          tmp_z   = tmp_z[ tmp_z < altura_max ]/1000.0
           if tmp_ref.size > 0 :
              pars = np.polyfit( tmp_z , tmp_ref , 1 )
              drefdz[mytime] = pars[0]
@@ -149,8 +150,8 @@ for my_radius in radius :
           else  :
              maxref[mytime] = np.nan
              drefdz[mytime] = np.nan
-          vil[mytime] = data['vil'][mytime]
-          reflow[mytime] = data['meanref_th_profile'][0,mytime]
+          vil[mytime] = data['vil_ext'][mytime]
+          reflow[mytime] = data['meanref_th_profile_ext'][0,mytime]
        
 
       for mytime in range( n_times ) :
@@ -163,12 +164,15 @@ for my_radius in radius :
           drefdzs[mytime] = np.nanmean( drefdz[mini:maxi] )
           
       plt.figure(figsize=[24,8])
-      plt.plot( reflow , '-b' , label='RefLow')
-      plt.plot( maxref , '-r', label='MaxRef' )
-      plt.plot( vil * 100 , '-g' , label='Vil * 1e2')
-      plt.plot( drefdzs * 10 , '-k' , label='DZr/Dz * 10.0')
-      plt.ylim([-50,60])
+      plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%H%M'))
+      plt.gca().xaxis.set_major_locator(mdates.HourLocator())
+      plt.plot( times , reflow , '-b' ,linewidth=3,label='RefLow')
+      plt.plot( times , maxref , '-r',linewidth=3, label='MaxRef' )
+      plt.plot( times , vil * 100 , '-g' ,linewidth=3, label='Vil * 1e2')
+      plt.plot( times , -drefdzs * 10 , '-k' ,linewidth=3, label='-DZr/Dz * 10.0')
+      plt.ylim([-10,70])
       plt.grid()
+      plt.gcf().autofmt_xdate()
       plt.legend()
       plt.title('Series de tiempo para ' + str(time_profile) + ' R=' + str(my_radius) + ' DZ=' + str(my_dz), fontsize=18)
       plt.show()
