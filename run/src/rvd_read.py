@@ -8,7 +8,7 @@ import io
 import pyart
 #import matplotlib.pyplot as plt
 
-shift_az=7.5   #
+shift_az=7.4999   #No usar 7.5 porque genera un problema con la founcion np.round()
 shift_date = '20150420'
 
 def rvd_read( input_file , radar_lon , radar_lat , radar_alt , correct_az = True , correct_elev = True ) :
@@ -110,6 +110,7 @@ def rvd_read( input_file , radar_lon , radar_lat , radar_alt , correct_az = True
       cdate = header['DATE']
       if float(cdate[0:8]) < float(shift_date)   :
          radar.azimuth['data'] = radar.azimuth['data'] + shift_az 
+         radar.azimuth['data'][radar.azimuth['data']>360.0]=radar.azimuth['data'][radar.azimuth['data']>360.0]-360.0
 
    # Let's work on the field data, we will just do reflectivity for now, but any of the
    # other fields can be done the same way and added as a key pair in the fields dict.
