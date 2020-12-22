@@ -24,9 +24,14 @@ conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
 conf['delta_z']=500.0           #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
 conf['vil_threshold']=0.1       #Valor de VIL a partir del cual los perfiles son incorporados. 
-
+conf['etop_threshold']=5000.0   #Valor de echo top a partir del cual los perfiles son incorporados.
+conf['lowref_threshold']=20.0   #Valor minimi de dbz que debemos tener en el nivel mas bajo para incorporar un perfil.
 radius = [ 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
 delta_z = [ 1000.0 , 2000.0 ]
+
+#radius = [ 5000.0  ]
+#delta_z = [ 1000.0  ]
+
 
 #Cargo la base de datos de las estaciones.
 station_dict = rpm.get_stations( station_database_file )

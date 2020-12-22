@@ -33,8 +33,12 @@ event='87585_2013040212'
 #para esos valores. Si del analisis preliminar se desprende que estaria bueno provar con mas 
 #valores en algun rango vamos al servidor y generamos esos experimentos para analizarlos aqui.
 
-radius = [ 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
-dz = [ 1000.0 , 2000.0 ]
+#radius = [ 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
+#dz = [ 1000.0 , 2000.0 ]
+
+radius = [ 5000.0  ]
+dz = [ 1000.0  ]
+
 
 for my_radius in radius :
   for my_dz in dz :
