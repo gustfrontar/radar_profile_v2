@@ -21,9 +21,33 @@ import sys
 from src import missing_period_module as mpm 
 
 
-pkl_path = '../pkl/'
-#Definimos el evento que vamos a estudiar
-event='87585_2013040212'
+event_list_file       = './csv/lista_casos.csv'
+station_database_file = './csv/estaciones.csv'
+pkl_path              = '../pkl/'
+fig_path              = '../fig/'
+
+conf=dict()
+conf['latradar']=-34.787778
+conf['lonradar']=-58.536667
+conf['altradar']=30
+conf['dz'] = [ 1000.0  ]
+conf['radius']=5000.0           #Este es el radio del cilindro que se toma alrededor de la estacion y sobre el cual se promedia la reflectividad.
+conf['min_ref_profile']=-30.0   #Los valores de reflecividad por debajo de este valor no van a ser considerados en el calculo del perfil vertical de reflectividad.
+conf['min_ref_etop']=10.0       #Este es el valor de reflectividad usado para el calculo del echotop (y del VILD)
+conf['z_min']=0.0               #La altura minima donde arranca el perfil.
+conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
+conf['delta_z']=1000.0          #La resolucion vertical del perfil.
+conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
+conf['vil_threshold']=0.1       #Valor de VIL a partir del cual los perfiles son incorporados. 
+conf['etop_threshold']=5000.0   #Valor de echo top a partir del cual los perfiles son incorporados.
+conf['lowref_threshold']=20.0   #Valor minimi de dbz que debemos tener en el nivel mas bajo para incorporar un perfil.
+
+
+#Cargo la base de datos de las estaciones.
+station_dict = rpm.get_stations( station_database_file )
+
+
+file_list = glob.glob( pkl_path + '/*r' + str(conf['radious']) + '_dz_' + str(conf['dz']) + '.pkl' )[0:2] 
 
 #Los casos posibles son: 87553_2013040212 ; 87585_2013040212 ; 87593_2013040300
 
@@ -36,14 +60,7 @@ event='87585_2013040212'
 #radius = [ 1000.0 , 2500.0 , 5000.0 , 10000.0 ]
 #dz = [ 1000.0 , 2000.0 ]
 
-radius = [ 5000.0  ]
-dz = [ 1000.0  ]
-
-
-for my_radius in radius :
-  for my_dz in dz :
-      #Genero el nombre del pkl que guarda los datos para el evento seleccionado y para la combinacion de radio y dz correspondiente.
-      my_file = pkl_path + '/event_profiles_' + event + '_sens_r' + str(my_radius) + '_dz_' + str(my_dz) + '.pkl' 
+for my_file in file_list :
 
       my_f = open( my_file , 'rb' )  #my_f es un objeto que refiere al archivo y su contenido (similar a cuando leemos un archivo en fortran y le asignamos un numero)  
 
@@ -56,7 +73,6 @@ for my_radius in radius :
       #sean indistinguibles de los faltantes. Hay que ver como solucionar eso. 
       data = mpm.add_missing_periods( data , 20 ) 
 
-
       #==============================================================================#
       # COMIENZA EL GRAFICADO
 
@@ -67,7 +83,6 @@ for my_radius in radius :
       for ii in range(n_times):
          dateobj =   dt.strftime( data['date_ext'][ii] , '%Y-%m-%d-%H:%M:%S' ) 
          times[ii] = mdates.datestr2num(dateobj)
-
 
       #==============================================================================#
       # GRAFICO REFLECTIVIDAD MEDIA EN FUNCION DE LA ALTURA Y EL TIEMPO
@@ -91,8 +106,9 @@ for my_radius in radius :
       plt.title(data['ID']+' '+data['name']+'  Periodo: '+data['ini_date']+'Z-'+data['end_date']+'Z' + ' R=' + str(my_radius) + ' DZ=' + str(my_dz), fontsize=18)
       plt.xlabel('Tiempo [UTC]', fontsize=14)
       plt.ylabel('Altura [km]', fontsize=14)
-
-      plt.show()
+      plt.savefig( fig_path + '/' + os.basename( my_file )[:-4] + '_fig1.png' )
+      plt.close()
+      #plt.show()
 
 
       #==============================================================================#
@@ -126,7 +142,8 @@ for my_radius in radius :
       plt.ylim([0,15])
       plt.xlim([-10,60])
 
-      plt.show()
+      plt.savefig( fig_path + '/' + os.basename( my_file )[:-4] + '_fig2.png' )
+      plt.close()
 
       #==============================================================================#
       # GRAFICO REFLECTIVIDAD MEDIA EN FUNCION DE LA ALTURA Y EL TIEMPO
@@ -179,6 +196,7 @@ for my_radius in radius :
       plt.gcf().autofmt_xdate()
       plt.legend()
       plt.title('Series de tiempo para ' + str(time_profile) + ' R=' + str(my_radius) + ' DZ=' + str(my_dz), fontsize=18)
-      plt.show()
+      plt.savefig( fig_path + '/' + os.basename( my_file )[:-4] + '_fig3.png' ) 
+      plt.close()
 
 

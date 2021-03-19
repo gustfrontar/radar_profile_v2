@@ -15,14 +15,16 @@ conf=dict()
 conf['latradar']=-34.787778
 conf['lonradar']=-58.536667
 conf['altradar']=30
-conf['radius']=10000.0          #Este es el radio del cilindro que se toma alrededor de la estacion y sobre el cual se promedia la reflectividad.
-conf['min_ref_profile']=5.0     #Los valores de reflecividad por debajo de este valor no van a ser considerados en el calculo del perfil vertical de reflectividad.
+conf['radius']=5000.0           #Este es el radio del cilindro que se toma alrededor de la estacion y sobre el cual se promedia la reflectividad.
+conf['min_ref_profile']=-30.0   #Los valores de reflecividad por debajo de este valor no van a ser considerados en el calculo del perfil vertical de reflectividad.
 conf['min_ref_etop']=10.0       #Este es el valor de reflectividad usado para el calculo del echotop (y del VILD)
 conf['z_min']=0.0               #La altura minima donde arranca el perfil.
 conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
-conf['delta_z']=500.0           #La resolucion vertical del perfil.
+conf['delta_z']=1000.0          #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
-conf['vil_threshold']=5.0       #Valor de VIL a partir del cual los perfiles son incorporados. 
+conf['vil_threshold']=0.1       #Valor de VIL a partir del cual los perfiles son incorporados. 
+conf['etop_threshold']=5000.0   #Valor de echo top a partir del cual los perfiles son incorporados.
+conf['lowref_threshold']=20.0   #Valor minimi de dbz que debemos tener en el nivel mas bajo para incorporar un perfil.
 
 
 #Cargo la base de datos de las estaciones.
@@ -61,9 +63,9 @@ for ievent , my_event in enumerate( cases_dict['date'] ) :
       event_profiles['name'] = station_dict[ cases_dict['ID'][ievent] ]['name']
 
       #Para ahorrar espacio en disco.
-      del event_profiles['z_raw_profile']
-      del event_profiles['alt_raw_profile']
-      del event_profiles['elev_raw_profile']
+      #del event_profiles['z_raw_profile']
+      #del event_profiles['alt_raw_profile']
+      #del event_profiles['elev_raw_profile']
 
       #Guardamos el perfil medio sobre el cilindro. 
       pickle_file = output_path + '/event_profiles_' + cases_dict['ID'][ievent] + '_' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + '.pkl'
