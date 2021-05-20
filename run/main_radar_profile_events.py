@@ -22,7 +22,7 @@ conf['z_min']=0.0               #La altura minima donde arranca el perfil.
 conf['z_max']=15000.0           #La altura maxima donde termina el perfil.
 conf['delta_z']=1000.0          #La resolucion vertical del perfil.
 conf['undef']=-32.0             #Valor de reflectividad que indica la falta de dato. 
-conf['vil_threshold']=0.1       #Valor de VIL a partir del cual los perfiles son incorporados. 
+conf['vil_threshold']=1.0       #Valor de VIL a partir del cual los perfiles son incorporados. 
 conf['etop_threshold']=5000.0   #Valor de echo top a partir del cual los perfiles son incorporados.
 conf['lowref_threshold']=20.0   #Valor minimi de dbz que debemos tener en el nivel mas bajo para incorporar un perfil.
 
@@ -42,7 +42,7 @@ for ievent , my_event in enumerate( cases_dict['date'] ) :
    event_end_date = dt.strftime( event_date + dt_end , '%Y%m%d%H' )
    
    #Busco la lista de archivos que necesito leer para este evento.
-   conf['filelist'] = rpm.get_filelist( event_ini_date , event_end_date , radar_data_path , name_filter=['cz240p1','cz240p0'] , sufix='.z.rvd' , data_order='RVD' ) 
+   conf['filelist'] = rpm.get_filelist( event_ini_date , event_end_date , radar_data_path , name_filter=['cz240p1','cz240p0'] , sufix='.z.rvd' , data_order='RVD' )
 
    print( cases_dict['ID'][ievent] + ' , ' + dt.strftime( cases_dict['date'][ievent] , '%Y%m%d%H' ) + ' , ' + str(len( conf['filelist']  )) )
 

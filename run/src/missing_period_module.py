@@ -57,6 +57,7 @@ def add_missing_periods( data , delta_t_max ) :
    data['minref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
    data['stdref_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
    data['vil_ext'] = np.zeros( ( nt + 2*len(data['missing_list']) ) ) + np.nan
+   data['etop_ext'] = np.zeros( ( nt + 2*len(data['missing_list']) ) ) + np.nan
    data['num_th_profile_ext'] = np.zeros( ( nz , nt + 2*len(data['missing_list']) ) ) + np.nan
    
    data['z_raw_profile_ext'] = list()
@@ -87,6 +88,7 @@ def add_missing_periods( data , delta_t_max ) :
       data['stdref_th_profile_ext'][:,it+dindex] = data['stdref_th_profile'][:,it]
       data['num_th_profile_ext'][:,it+dindex] = data['num_th_profile'][:,it]
       data['vil_ext'][it+dindex] = data['vil'][it]
+      data['etop_ext'][it+dindex] = data['etop'][it]
       data['z_raw_profile_ext'].append( data['z_raw_profile'][it] )
       data['alt_raw_profile_ext'].append( data['alt_raw_profile'][it] )
 
@@ -95,6 +97,11 @@ def add_missing_periods( data , delta_t_max ) :
    if nt in data['missing_index_list'] :
       data['date_ext'].append( data['datedt'][-1] + dt_add )
       data['date_ext'].append( dt.strptime( data['end_date'] , '%Y%m%d%H' ) )
+      data['z_raw_profile_ext'].append( [] )
+      data['alt_raw_profile_ext'].append( [] )
+      data['z_raw_profile_ext'].append( [] )
+      data['alt_raw_profile_ext'].append( [] )
+
 
 
    return data

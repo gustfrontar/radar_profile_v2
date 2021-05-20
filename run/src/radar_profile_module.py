@@ -35,7 +35,7 @@ def get_stations( database_file ) :
     return station_dict
 
 
-def get_cases( database_file )  :
+def get_cases( database_file , sounding_data = False )  :
     
     f = open( database_file , "r" )
     cases_dict=dict()
@@ -43,6 +43,13 @@ def get_cases( database_file )  :
     cases_dict['date']=list()
     cases_dict['rank']=list()
     cases_dict['pp6h']=list()
+
+    if sounding_data : 
+       cases_dict['soundingdate'] = list()
+       cases_dict['H0degC'] = list()
+       cases_dict['Hm10degC'] = list()
+       cases_dict['Hm20degC'] = list()
+
     cont = True
     while( cont ) :
        tmp=f.readline()
@@ -52,6 +59,11 @@ def get_cases( database_file )  :
           cases_dict['date'].append( dt.strptime( newline[2] + '/' + newline[1] ,'%H/%d/%m/%Y' ) )
           cases_dict['rank'].append( newline[3] )
           cases_dict['pp6h'].append( newline[4].rstrip("\n") )
+          if sounding_data :
+             cases_dict['soundingdate'].append( newline[5] )
+             cases_dict['H0degC'].append( float( newline[6] ) ) 
+             cases_dict['Hm10degC'].append( float( newline[7] ) )
+             cases_dict['Hm20degC'].append( float( newline[8].rstrip("\n") ) )
        else :
           cont=False
 
@@ -222,6 +234,7 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
    nump = np.zeros(nbin)   
 
    #ref[ref==undef] = np.nan
+   max_vil_power = 10.0**(56.0/10)
 
    for ii in range( nbin ) :
        my_mask = ( z <= zp_max[ii] ) & ( z >= zp_min[ii] ) & ( ~ np.isnan( ref ) )  & ( ref > min_ref ) & ( ref != undef )
@@ -244,8 +257,8 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
 
        if ~ np.isnan( meanp[ii+1] ) & ~ np.isnan( meanp[ii] ) :
           tmp_z_mean = 0.5 * (meanpower[ii+1] + meanpower[ii])
-          if tmp_z_mean > 56.0 :
-             tmp_z_mean = 56.0
+          if tmp_z_mean > max_vil_power :
+             tmp_z_mean = max_vil_power
           vil_inc = 3.44e-6 * ( ( tmp_z_mean )**(4.0/7.0) ) * delta_z
           if np.isnan( vil ) :
              vil = vil_inc
@@ -253,8 +266,6 @@ def grid_profile( ref , z , conf ) : #z_min=0.0 , z_max=15000.0 , delta_z = 500.
              vil = vil + vil_inc
    if ~ np.isnan( etop ) & ~ np.isnan( vil ) :
        vild = 1000.0 * vil / etop 
-
-   
 
    return zp , meanp , stdp , minp , maxp , nump , etop , vil , vild
 
@@ -343,7 +354,7 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     distancia = np.sqrt( ( dlon * 111000.0 )**2 + ( dlat * 111000.0 )**2 )
     date = radar.metadata['start_datetime']
 
-    mascara = np.logical_and( distancia <= conf['radius'] , vil_int > conf['vil_threshold'] ) 
+    mascara = np.logical_and( distancia <= conf['radius'] , conf['vil_threshold'] ) 
     mascara = np.logical_and( mascara , etop_int > conf['etop_threshold'] )
     mascara = np.logical_and( mascara , dbz_int[:,:,0] > conf['lowref_threshold'] )
     #mascara =  distancia <= conf['radius'] 
@@ -356,6 +367,7 @@ def extract_profile_data_interp( filename , conf ) : #radius , lonp , latp , lon
     elev = lev3d[ mascara3d ]
     alt  = z_int[ mascara3d ]
     #vil  = vil_int[ mascara ]
+    #print( vil_int[mascara] )
 
     #Buscamos los puntos que son el vecino mas cercano (nn) del punto seleccionado en cada ppi para
     #construir el perfil de vecinos mas cercanos. 
@@ -423,6 +435,9 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef , etop_thresh=5.0 )  :
 
   ranger = ( x**2 + y**2 )**0.5
   ranger0 = ranger[:,:,0]
+
+  #import matplotlib.pyplot as plt
+
   
   #Calculo el VIL en la reticula x0 , y0
   for ie in range(ne)   :
@@ -430,11 +445,12 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef , etop_thresh=5.0 )  :
     dbz2d_mean = local_mean( dbz2d , 1 , 1 , undef )
     #Intento salvar algunos agujeros que pueda haber en el campo de reflectividad.
     mask = np.logical_or( dbz2d == undef , dbz2d < 0.0 )
-    dbz2d[ mask ] = dbz2d_mean[mask]
+    dbz2d[ mask ] = dbz2d_mean[ mask]
     #Los undef que quedaron pasan a ser 0 para el calcuo del VIL 
     #dbz2d[dbz2d == undef ] = fill_value_power  
     dbz2d = 10.0 ** (  dbz2d / 10.0 )
     dbz2d[ dbz[:,:,ie] == undef ] = fill_value_power
+
               
     for ia in range(na)   :
       
@@ -446,8 +462,14 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef , etop_thresh=5.0 )  :
     if ie > 0 :
       dz = z_int[:,:,ie] - z_int[:,:,ie-1] ; dz[dz==0] = np.nan
       vil_inc = 3.44e-6 * ( ( 0.5*(dbz_int[:,:,ie] + dbz_int[:,:,ie-1]) ) ** (4.0/7.0) ) * ( dz )
+      #max_ind = np.argmax( vil_inc )
+      #print( np.reshape(vil_inc,vil_inc.size)[max_ind] , np.reshape( 10.0*np.log10( 0.5 * ( dbz_int[:,:,ie] + dbz_int[:,:,ie-1] ) ) ,vil_inc.size)[max_ind] , np.reshape( dz,dz.size)[max_ind] )
       vil_inc[np.isnan(vil_inc)] = 0.0 
       vil_int = vil_int + vil_inc
+
+      #plt.pcolor( vil_inc ) ; plt.colorbar() ; plt.show()
+      #plt.pcolor( dbz[:,:,ie] ) ; plt.colorbar() ; plt.show()
+      #plt.pcolor( dz ) ; plt.colorbar() ; plt.show()
 
     #Echo top computation      
     etop_init_mask[ np.logical_and( dbz[:,:,ie] > etop_thresh , np.logical_not( etop_detected_mask ) ) ]=True
@@ -466,9 +488,8 @@ def calcula_vil( dbz_in , x_in , y_in , z_in , undef , etop_thresh=5.0 )  :
   #Hasta aca tenemos vil_int que es el vil en la reticula x0 y0. Para las cuentas en general nos puede venir bien
   #tener el vil interpolado a la reticula x,y (es decir un vil definido para todoas las elevaciones del radar)
   vil_int[ np.isnan(vil_int) ] = 0.0
-  dbz_int_out = 10.0*np.log10(dbz_int)
+  dbz_int_out = 10.0 * np.log10( dbz_int ) 
   dbz_int_out[ dbz_int == fill_value_power ] = undef 
-  
   
      
   return vil_int , etop_int , dbz_int_out , z_int  
